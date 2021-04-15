@@ -97,7 +97,7 @@ def respond(sock):
     docroot = options.DOCROOT
     if len(parts) > 1 and parts[0] == "GET":
         pages = os.listdir(docroot)
-        file_name = pages[1][1:]
+        file_name = parts[1][1:]
         if file_name.startswith("/") or file_name.startswith("..") or file_name.startswith("~"):
             transmit(STATUS_FORBIDDEN, sock)
         elif file_name in pages:
