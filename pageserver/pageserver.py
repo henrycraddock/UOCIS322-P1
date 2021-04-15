@@ -13,15 +13,17 @@
   program is run).
 """
 
-import config    # Configure from .ini files and command line
-import logging   # Better than print statements
+import config  # Configure from .ini files and command line
+import logging  # Better than print statements
+
 logging.basicConfig(format='%(levelname)s:%(message)s',
                     level=logging.INFO)
 log = logging.getLogger(__name__)
 # Logging level may be overridden by configuration 
 
-import socket    # Basic TCP/IP communication on the internet
-import _thread   # Response computation runs concurrently with main program
+import socket  # Basic TCP/IP communication on the internet
+import _thread  # Response computation runs concurrently with main program
+import os  # Used for navigating directories and finding files
 
 
 def listen(portnum):
@@ -38,7 +40,7 @@ def listen(portnum):
     serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     # Bind to port and make accessible from anywhere that has our IP address
     serversocket.bind(('', portnum))
-    serversocket.listen(1)    # A real server would have multiple listeners
+    serversocket.listen(1)  # A real server would have multiple listeners
     return serversocket
 
 
@@ -90,9 +92,21 @@ def respond(sock):
     log.info("Request was {}\n***\n".format(request))
 
     parts = request.split()
+    log.info(str(parts))
+    options = get_options()
+    docroot = options.DOCROOT
     if len(parts) > 1 and parts[0] == "GET":
-        transmit(STATUS_OK, sock)
-        transmit(CAT, sock)
+        pages = os.listdir(docroot)
+        file_name = pages[1][1:]
+        if file_name.startswith("/") or file_name.startswith("..") or file_name.startswith("~"):
+            transmit(STATUS_FORBIDDEN, sock)
+        elif file_name in pages:
+            with open(docroot + "/" + file_name, 'r') as f:
+                file_content = f.read()
+                transmit(STATUS_OK, sock)
+                transmit(file_content, sock)
+        else:
+            transmit(STATUS_NOT_FOUND, sock)
     else:
         log.info("Unhandled request: {}".format(request))
         transmit(STATUS_NOT_IMPLEMENTED, sock)
@@ -109,6 +123,7 @@ def transmit(msg, sock):
     while sent < len(msg):
         buff = bytes(msg[sent:], encoding="utf-8")
         sent += sock.send(buff)
+
 
 ###
 #
@@ -129,8 +144,8 @@ def get_options():
 
     if options.PORT <= 1000:
         log.warning(("Port {} selected. " +
-                         " Ports 0..1000 are reserved \n" +
-                         "by the operating system").format(options.port))
+                     " Ports 0..1000 are reserved \n" +
+                     "by the operating system").format(options.port))
 
     return options
 
