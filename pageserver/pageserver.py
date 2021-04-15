@@ -5,12 +5,6 @@
   This trivial implementation is not robust:  We have omitted decent
   error handling and many other things to keep the illustration as simple
   as possible.
-
-  FIXME:
-  Currently this program always serves an ascii graphic of a cat.
-  Change it to serve files if they end with .html or .css, and are
-  located in ./pages  (where '.' is the directory from which this
-  program is run).
 """
 
 import config  # Configure from .ini files and command line
@@ -80,10 +74,15 @@ STATUS_NOT_FOUND = "HTTP/1.0 404 Not Found\n\n"
 STATUS_NOT_IMPLEMENTED = "HTTP/1.0 401 Not Implemented\n\n"
 
 
+def invalid_sym(string):
+    """Simple helper meathod used to detect invalid symbols in request"""
+    return "//" in string or ".." in string or "~" in string
+
+
 def respond(sock):
     """
     This server responds only to GET requests (not PUT, POST, or UPDATE).
-    Any valid GET request is answered with an ascii graphic of a cat.
+    Any valid GET request is answered with the appropriate webpages and/or HTTP codes.
     """
     sent = 0
     request = sock.recv(1024)  # We accept only short requests
@@ -92,21 +91,26 @@ def respond(sock):
     log.info("Request was {}\n***\n".format(request))
 
     parts = request.split()
-    log.info(str(parts))
-    options = get_options()
-    docroot = options.DOCROOT
+    log.info(str(parts))    # Added for testing purposes
+    docroot = get_options().DOCROOT   # docroot is the file path ./pages
     if len(parts) > 1 and parts[0] == "GET":
         pages = os.listdir(docroot)
-        file_name = parts[1][1:]
-        if file_name.startswith("/") or file_name.startswith("..") or file_name.startswith("~"):
+        file_name = parts[1]
+        if invalid_sym(file_name):
+            # Forbidden files
+            log.info("Forbidden request: {}".format(request))
             transmit(STATUS_FORBIDDEN, sock)
-        elif file_name in pages:
-            with open(docroot + "/" + file_name, 'r') as f:
+            transmit("\n403 Forbidden: {}\n".format(request), sock)
+        elif file_name[1:] in pages:    # Slice off "/" to check if file exists
+            with open(docroot + file_name, 'r') as f:
                 file_content = f.read()
                 transmit(STATUS_OK, sock)
                 transmit(file_content, sock)
         else:
+            # Not found files
+            log.info("Request not found: {}".format(request))
             transmit(STATUS_NOT_FOUND, sock)
+            transmit("\n404 Not found: {}\n".format(request), sock)
     else:
         log.info("Unhandled request: {}".format(request))
         transmit(STATUS_NOT_IMPLEMENTED, sock)
